@@ -1,0 +1,26 @@
+{
+    "posts": [
+        {
+            "name": "hello-world",
+            "title": "Hello World",
+            "description": "A greetings to fellow readers and newcomers",
+            "tags": [
+                "hello",
+                "world"
+            ],
+            "date": "25/03/2024",
+            "author": "praisethemoon"
+        }
+    ],
+
+    "authors": [
+        {
+            "id": "praisethemoon",
+            "name": "Soulaymen Chouri",
+            "gh": "https://github.com/praisethemoon",
+            "website": "https://praisethemoon.org",
+            "bio": "Software Engineer, author of Type-C, maintainer of the Type-C ecosystem",
+            "avatar": "https://avatars.githubusercontent.com/u/22145460?v=4"
+        }
+    ]
+}
