@@ -16,3 +16,65 @@ The current state of Type-C at the time of writing is the following:
 
 It will take a while before Type-C is stable and ready for production, as both the compiler and the VM will need to be thouroughly tested,
 this also takes into the account the lack JIT compiler, which is a must to have feature for Type-C
+
+So when we are here, let's talk about the latest changes to the language design:
+
+## Async Execution
+It has been decided that `libuv` will be added to the VM as a FFI, to enable async execution of code. This will be a huge change to the language, 
+as it will allow for more effiecient code execution per thread. 
+
+## Threads
+A new data type has been added `thread<T>`, which will allow for concurrent execution of code. Threads created this way maps to native OS threads.
+
+## Comparaison with the previous design
+In my original design, I wanted to implement Erlang like concurrency primitives (called Actors in Erlang, I called them Processes in Type-C). The feature didn't make it to the language level, but I was experimenting
+on my VM, it worked very well. The assembly you are about to see is specific to Type-V and currently outdate (since process instructions have been removed)
+
+```c
+VERSION: 1
+
+CONST:
+
+GLOBAL:
+    x: u64 = 0
+CODE:
+    p_queue_size r0
+    debug_reg r0
+
+    ; spawn
+    p_alloc r1 proc1 ; allocate new process and 
+                     ; store its address in r1
+    mv_reg_i r12 10
+
+    p_emit r1 r2 r3 ; emit to r2, msg r3,
+                    ; promise stored in r3
+    promise_await r3 ; await r3 promise, 
+                     ;store result in r4
+    promise_data r4 r3
+    debug_reg r4
+    p_send_sig r1 1
+    halt
+
+
+proc1:
+    p_wait_queue ; process will always await for a message.
+                 ; when no message is present, VM will be 
+                 ; running other processes
+
+    p_dequeue r14 r1         ; dequeue message from process queue
+    mv_reg_i r15 1           ; store 1 in r15
+    add_u32 r15 r15 r14      ; r15 := r14 + 1
+
+    promise_resolve r1 r15   ; resolve promise with r15
+    debug_reg r15            ; print r15        
+    j proc1                  ; repeat
+```
+
+This approach worked very well in the VM, but there was one limitation, the VM will constantly need to check queue statuses and events, which when you have a lot of processes, will 
+take a noticable time. This might endup slowing down the main process.
+
+The goal of Type-C is to be a fast language, and this design didn't align with that goal. So I decided to go with a more traditional approach, which is threads. Each threads runs its own context, and some primitives has been added to the language to allow for communication between threads.
+
+At the time of writing, the new design is being implemented language level, since we have new data types, compiler and code generator will need to be adjusted.
+
+Wish me luck! 👋
