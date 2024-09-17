@@ -1,13 +1,18 @@
 {
     "posts": [
         {
+            "name": "type-c-closures",
+            "title": "Closures Implementation in Type-C",
+            "description": "A deep dive into the implementation of closures in the current Type-C Compiler",
+            "tags": ["closures", "compiler", "bytecode"],
+            "date": "16/09/2024",
+            "author": "praisethemoon"
+        },
+        {
             "name": "hello-world",
             "title": "Hello World",
             "description": "A greetings to fellow readers and newcomers",
-            "tags": [
-                "hello",
-                "world"
-            ],
+            "tags": ["hello", "world"],
             "date": "25/03/2024",
             "author": "praisethemoon"
         }

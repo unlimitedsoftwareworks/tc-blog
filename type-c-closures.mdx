@@ -1,0 +1,149 @@
+# Type-C Closures
+
+No one reads this blog anyway so I might as use it as backlog of ideas, for now :D
+
+## Before we begin
+Few important notes about Type-C:
+- Register allocation: Type-C cores has 256 registers.
+- Function Arguments, Locals and upvalues all live in registers
+- Function argument registers are marked as busy d
+
+## Current Behavior
+Currently, functions are implemented as just numbers. Meaning when a variable is assigned a function, in the VM side it is just the address of the function in the code segment.
+This works just fine, but as I am imlementing closures, this behavior is sadly about to change.
+
+## New Approach
+
+### Regular Function Call
+For regular function calls, class/interface method calls, the behavior will always be the same. All functions will be referenced by their address in the code segment.
+This is good not just for simplicity, but also for performance. We do not need to create any object that holds the reference to the function
+
+### Anonymous Functions
+```tc
+fn f(x: u32) = x + 1
+fn g(x: u32) = x + 2
+fn h(x: u32) = x + 3
+
+fn main() {
+    let a = f(1)
+    let b = [f, g, h]
+    let c = b[0](1)
+}
+```
+
+In this example, `f(1)` is a direct function call, the bytecode will be a direct call to the function address.
+
+```
+const_u32 tmp0, 1             ; the argument 1
+fn_alloc                      ; init the .next func state
+fn_set_reg_u8 0, tmp0         ; pass the first arg to R0
+call_i @f                     ; call the function, @f is the address of f
+fn_get_ret_reg_u8 tmp1, 255   ; get the return value
+```
+
+However, any function reference that is not used in the context of a function call, will be treated as a closure.
+This means that the VM will allocate a closure object that holds the function reference and the captured variables.
+
+so, `[f, g, h]` will be compiled to something like this:
+
+```
+closure_alloc tmp1, @f, 1 ; 1 is the number of occupied argument registers
+closure_alloc tmp2, @g, 1
+closure_alloc tmp3, @h, 1
+
+a_alloc tmp4, 3, 8 ; array of 3 elements, each element is 8 bytes
+...                ; push elements into the array
+```
+
+The result is essentially a function object within the bytecode, that contains the function reference and the captured variables.
+In cases where no upvalues are captured, the env will simply be 0.
+
+Let's take a look at an actual closure example:
+```tc
+type ClosureClass = class {
+    let x: u32
+
+    fn init(x: u32) {
+        this.x = x
+    }
+
+    fn closure(y: y32) -> fn() -> u32 {
+        return fn() -> u32 {
+            return this.x + y
+        }
+    }
+}
+```
+
+The class method `closure`, doe what you would expect, it returns a closure that captures the `this` object.
+Now let's have a look at the generate IR for this function:
+
+<img src="/images/2-closure-ir.png" alt="IR for ClosureClass.closure" />
+
+`closure_push_env_<type>` captures the register given register into the closure object, and pushes it into the closure's captured variables,
+which are esentially registers.
+
+Here is how the Closure object looks like from VM's perspective:
+```c
+typedef struct TypeV_Closure {
+    uintptr_t fnAddress;      ///< Function state
+    TypeV_Register* upvalues; ///< Captured registers
+    uint8_t envSize;          ///< Environment size
+    uint8_t envCounter;       ///< Environment size
+    uint8_t offset;           ///< Upvalues start registers, right after the args
+}TypeV_Closure;
+```
+
+A closure needs a function to address, and the registered registers.
+I have decided to use push instead of giving the captured upvalue index for simplicity and performance, especially
+since the order is deterministic, at compile time.
+
+### Calling a closure
+First, a regular function allocation must be done, this is to initialize the `.next` function state, which a separate state of registers and
+execution environment for the VM.
+Once that is allocated, arguments are also passed as usual. Notice how we are storing the `offset` field in the closure, this mark essentially
+the number of arguments that are passed to function, closures will also be passed as registers, starting from `R_offset`
+```c
+static inline void closure_call(TypeV_Core* core) {
+    uint8_t closureReg = core->codePtr[core->ip++];
+    TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
+    // sets the enviroment of the core->funcState to the closure's enviroment
+    const size_t adr = cl->fnAddress;
+
+    // back up IP in funcState
+    core->funcState->ip = core->ip;
+    core->ip = adr;
+    core->funcState = core->funcState->next;
+    core->regs = core->funcState->regs;
+
+    uint8_t offset = cl->offset;
+    // copy the closure's environment to the function's environment
+    for (uint8_t i = 0; i < cl->envSize; i++) {
+        core->funcState->regs[i+offset] = cl->upvalues[i];
+    }
+}
+```
+
+Finally, once the closure returns, we need to back up the registers to the closure object, this is done by a special instruction called
+`closure_backup`, which is inserted by the compiler after a closure call.
+
+```c
+static inline void closure_backup(TypeV_Core* core) {
+    uint8_t closureReg = core->codePtr[core->ip++];
+    TypeV_Closure* cl = (TypeV_Closure*) core->regs[closureReg].ptr;
+    uint8_t offset = cl->offset;
+
+    for(uint8_t i = 0; i < cl->envSize; i++) {
+        cl->upvalues[i] = core->funcState->next->regs[i+offset];
+    }
+}
+```
+
+This instruction is not modeled in the IR, as it is emitted by the bytecode generator, which generate concrete type-v bytecode.
+After that, return values are also read from `.next` function state registers as usual.
+
+
+### Impact of this this design choice:
+- Upvalues passed by registers, means we do not need special instructions to read/write data from and to the closure object.
+Everything is in registers minimizing the overhead.
+- Too many Upvalues/Args/Local will add more stress on register allocator, and it might fail (extreme cases, which indicate bad code anyway)
