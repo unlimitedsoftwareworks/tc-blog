@@ -1,6 +1,14 @@
 {
     "posts": [
         {
+            "name": "type-c-coroutines",
+            "title": "Coroutines Design in Type-C",
+            "description": "A Quick Look into Type-C Coroutines Design and Implementation",
+            "tags": ["coroutines", "compiler", "bytecode"],
+            "date": "17/09/2024",
+            "author": "praisethemoon"
+        },
+        {
             "name": "type-c-closures",
             "title": "Closures Implementation in Type-C",
             "description": "A deep dive into the implementation of closures in the current Type-C Compiler",

@@ -99,7 +99,7 @@ I have decided to use push instead of giving the captured upvalue index for simp
 since the order is deterministic, at compile time.
 
 ### Calling a closure
-First, a regular function allocation must be done, this is to initialize the `.next` function state, which a separate state of registers and
+First, a regular function state allocation must be done, this is to initialize the `.next` function state, which a separate state of registers and
 execution environment for the VM.
 Once that is allocated, arguments are also passed as usual. Notice how we are storing the `offset` field in the closure, this mark essentially
 the number of arguments that are passed to function, closures will also be passed as registers, starting from `R_offset`
@@ -147,3 +147,4 @@ After that, return values are also read from `.next` function state registers as
 - Upvalues passed by registers, means we do not need special instructions to read/write data from and to the closure object.
 Everything is in registers minimizing the overhead.
 - Too many Upvalues/Args/Local will add more stress on register allocator, and it might fail (extreme cases, which indicate bad code anyway)
+- Even non-closure anonymous functions and lambda expressions are now created as closures.
