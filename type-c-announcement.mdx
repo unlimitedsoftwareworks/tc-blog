@@ -1,0 +1,402 @@
+# Hello, world!
+
+You are probably here because you have clicked a link on reddit, or by chance. Welcome anyway!
+
+I want this post to be a showcase of Type-C, its current state at the time of writing and a bit of future plans.
+
+## What is Type-C?
+It's like Java, but with a cool hat.
+
+Type-C is a high-level programming, primarily inspired by TypeScript. However Type-C takes a different shift from regular languages to focus more on
+performance, behavior driven programming, type safety and avoiding object oriented programming pitfalls.
+
+These are strong promises and Type-C is still under development. Right now the ecosystem is very limited and the language is not yet stable.
+There are a couple of test cases to make sure the language is working as expected, a working VM with limited memory (GC not fully finished yet).
+
+Now enough with words, we will just go through some code example to give you a taste of Type-C and get some feedback from you.
+
+## Show me some code!
+
+```tc
+from std.io import println
+from std.collections.array import Array, ArrayIterator
+
+fn main() {
+    let arr = new Array<f64>([1.0, 2.0, 3.0 , 4.0])
+
+    for let iter = arr.getIterable() ; iter.hasNext() ;  {
+        let (index, val) = iter()
+        println("Value: " + val + " at index: " + index)
+    }
+
+    return 0
+}
+```
+
+The language provides basic arrays similar to Java, but you can't do much with them, hence the limited functionality and the need for a proper standard library.
+Let's have a look at that class:
+
+```tc
+/**
+ * @file array.ts
+ * @description Default array interface
+ * Implemented within the VM level.
+ */
+type AbstractArray<T> = interface {
+    /** x[i] */
+    fn [] (i: u64) -> T
+    /** x[i] = v */
+    fn []= (v: T,i: u64) -> T
+
+    /**
+     * @description Returns the length of the array
+     */
+    fn length() -> u64
+
+    /**
+     * @description Returns the element at the given index
+     */
+    fn push(v: T) -> void
+
+    /**
+     * @description Returns the element at the given index
+     */
+    fn pop() -> T
+}
+
+type Array<T> = class AbstractArray<T> {
+    let data: T[]
+    let len: u64
+    let capacity: u64
+
+    fn init(mut data: T[]) {
+        this.data = data
+        this.len = data.length
+        this.capacity = this.len
+    }
+
+    fn length() -> u64 {
+        return this.len
+    }
+
+    fn push(v: T) -> void {
+        if this.len == this.capacity {
+            this.capacity = this.capacity * 2 + 1
+            this.data.extend(this.capacity)
+        }
+        this.data[this.len] = v
+        this.len = this.len + 1
+    }
+
+    fn pop() -> T {
+        if this.len == 0 {
+
+        }
+        this.len = this.len - 1
+        return this.data[this.len]
+    }
+
+    fn __index__(i: u64) -> T {
+        return this.data[i]
+    }
+
+    fn __index_set__(v: T, i: u64) -> T {
+        this.data[i] = v
+        return v
+    }
+
+    fn map<Z>(f: fn (x: T) -> Z) -> Array<Z> {
+        let result1 = new Array<Z>([])
+        for let i: u64 = 0; i < this.len; i = i + 1 {
+            result1.push(f(this.data[i]))
+        }
+
+        return result1
+    }
+
+    fn filter(f: fn (x: T) -> bool) -> Array<T> {
+        let result2 = new Array<T>([])
+
+        for let i: u64 = 0; i < this.len; i = i + 1 {
+            if f(this.data[i]) {
+                result2.push(this.data[i])
+            }
+        }
+        return result2
+    }
+
+    fn reduce(f: fn (x: T, y: T) -> T) -> T {
+        let result3 = this.data[0]
+        for let i: u64 = 1; i < this.len; i = i + 1 {
+            result3 = f(result3, this.data[i])
+        }
+        return result3
+    }
+
+    fn forEach<U>(f: fn (i: u64, x: T) -> U) -> void {
+        for  let i: u64 = 0; i < this.len; i = i + 1 {
+            f(i, this.data[i])
+        }
+    }
+
+    fn toIterator() {
+        let iterator = cfn() -> (T, bool) {
+            let counter: u64 = 0
+
+            for let i: u64 = 0; i < this.len-1; i = i + 1 {
+                let value = this.data[i]
+                yield (value, false)
+            }
+
+            let value = this.data[this.len-1]
+            yield! (value, true)
+        }
+
+        return coroutine iterator
+    }
+}
+```
+
+Classes can only implement interfaces, and interfaces can only have functions.
+However Type-C type matching is based on structure, so even if we remove `AbstractArray<T>` from `type Array<T> = class AbstractArray<T>`, `Array` would still match an `AbstractArray`, since methods match.
+
+Some of the issues with classes at the moment is that the compiler is unable to identify uninitialized attributes.
+
+Classes also are allowed to reuse methods, provided they are defined within an implementation type.
+
+An implementation type or `impl` for short, is a group of methods that a class can reuse. This is useful for defining methods that are shared between classes.
+
+```tc
+
+type DefaultGenericImpl<T> = impl (
+        value: T
+    ) {
+        fn getValue() -> T {
+            return this.value
+        }
+
+        fn setValue(mut newValue: T) -> void {
+            this.value = newValue
+        }
+    }
+
+type GenericContainer<T> = class {
+    let value: T
+
+    impl DefaultGenericImpl<T>(value)
+
+    fn init(mut value: T) {
+        this.value = value
+    }
+}
+```
+
+## Immutability
+Immutability is inverted in Type-C. By default, all variables are mutable, and function parameters are immutable by default.
+Immutability spreads to all fields of a class or an object.
+
+```tc
+let const a: {x: i32, y: i32} = {1, -1}
+a.x = 2 // Error
+```
+
+```tc
+fn updateVec(v: {x: i32, y: i32}) {
+    v.x = 3 // Error
+}
+
+fn updateVec(mut v: {x: i32, y: i32}) {
+    v.x = 3 // Ok
+}
+```
+
+Argument mutability is also part of the function signature.
+
+## Data Types
+Oh boy, I will just over the fancy stuff.
+
+### Structs
+Designed to behave similar to JavaScript objects, except they are not.
+
+```tc
+let u1 = {name: "Me!", age: 20, address: {city: "NYC", zip: 10001}}
+let u2 = {...u1, name: "You!", address: {...u1.address, city: "LA"}}
+
+let a: {x: i32, y: i32, z: i32} = {1, 2, 3}
+let b: {x: i32, y: i32} = a // same reference at runtime
+                            // cannot access b.z obviously
+```
+
+### Variants
+```tc
+// from tests/test13
+type HttpResponse = variant {
+    Success(code: u32, time: f32),
+    Error(buffer: u8[], code: u32)
+}
+
+fn test_case_3(rn: TestUnit) {
+
+    let arr3 = new Data<HttpResponse>()
+
+    arr3.push(HttpResponse.Success(200, 0.1f))
+    arr3.push(HttpResponse.Success(300, 0.1f))
+    arr3.push(HttpResponse.Error([1], 100))
+    arr3.push(HttpResponse.Error([1], 500))
+
+    let sum3: u32 = 0
+
+    for let i: u64 = 0; i < arr3.length ; i += 1 {
+        if arr3[i] is HttpResponse.Success {
+            let success = arr3[i] as! HttpResponse.Success
+            sum3 += success.code
+        }
+        else {
+            let error = arr3[i] as! HttpResponse.Error
+            sum3 += error.code
+        }
+    }
+
+    rn.assert_eq<u32>(sum3, 1100)
+}
+
+// from tests/test9
+type AnotherServerResponse<T> = variant {
+    Ok(code: T),
+    Error(msg: String)
+}
+
+fn test_case_8<U> (rn: TestUnit) {
+    let response: AnotherServerResponse<U> = AnotherServerResponse.Error<U>("Error")
+
+    match response {
+        AnotherServerResponse.Ok<U>(code) { println("Ok: "+ code) }
+        AnotherServerResponse.Error<U>(msg) { println("Error: "+ msg) }
+    }
+}
+```
+### Joins
+Only applicable to interfaces. Gets translated to an interface during compilation.
+
+```tc
+type DataArray = class {
+    let data: {
+        v: u16,
+        w: u16
+    }[]
+
+    fn init() {
+        this.data = []
+        this.data.extend(20)
+    }
+
+    fn get(index: u64) -> u16 {
+        return this.data[index].v
+    }
+
+    fn set(index: u64, value: u16) {
+        this.data[index] = {
+            v: value,
+            w: 1
+        }
+    }
+}
+
+let x = new DataArray()
+x.set(0, 1)
+x.set(1, 2)
+
+match x {
+    // should match since u8 is a subtype of u16
+    interface { fn get(index: u64) -> u16 } & interface { fn set(index: u64, value: u16) } {
+        let z = x as interface{ fn get(index: u64) -> u16 } & interface { fn set(index: u64, value: u16) }
+        z.set(2, 3)
+        rn.assert_eq<u16>(x.get(2), 3)
+    }
+    x {
+        rn.assert_unreachable()
+    }
+}
+```
+
+## Closures
+```tc
+fn outer(x: u32) -> fn(y: u32) -> fn(z: u32) -> u32 {
+    fn middle(y: u32) -> fn(z: u32) -> u32 {
+        fn inner(z: u32) -> u32 {
+            return x + y + z  // All three layers of variables are captured
+        }
+        return inner
+    }
+    return middle
+}
+
+let f = outer(1)    // Captures x = 1
+let g = f(2)        // Captures y = 2
+let h = g(3)        // Captures z = 3
+```
+
+## Pattern Matching
+Probably already seen it
+```tc
+from std.io import println
+
+fn stuff(x: {name: String, age: u32}[]){
+    match x {
+        [{name: "John", ...johnData}, b, ...z] {
+            //println("Found a {"+a.name+", "+a.age+"} and b {"+b.name+", "+b.age+"}")
+            println("json is {"+johnData.age+"},  and b {"+b.name+", "+b.age+"}")
+            println("remainings are "+z.length+" elements long")
+            for let i: u64 = 0; i < z.length; i+= 1 {
+                println("element "+i+" is {"+z[i].name+", "+z[i].age+"}")
+            }
+        }
+        _ {
+            println("other")
+        }
+    }
+}
+
+
+
+fn main() {
+    let users = [
+        {name: "John", age: 35 as u32},
+        {name: "Jane", age: 21},
+        {name: "Doe", age: 22, potato:-1},
+        {name: "John", age: 20, number: -1}]
+
+    stuff(users)
+}
+/*
+output:
+json is {35},  and b {Jane, 21}
+remainings are 2 elements long
+element 0 is {Doe, 22}
+element 1 is {John, 20}
+*/
+```
+
+## (almost) Everything is an expression
+Almost everything can be written in an expression form.
+
+```tc
+fn sum(a: u8, b: u8) = a + b
+
+fn main() {
+    let x =
+        let y = 1 in
+            let z = do { // do block is an expression
+                let a = 2
+                let b = 3
+                return sum(a, b)
+            } in z + 1
+
+    println("x = "+x)
+}
+```
+
+## Where to go from here
+There is plenty of stuff that I didn't cover, so have a look at the documentation!
+
+Cheers!
