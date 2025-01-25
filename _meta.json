@@ -1,6 +1,14 @@
 {
     "posts": [
         {
+            "name": "hello-type-ide",
+            "title": "Type-IDE",
+            "description": "A sneak peek into Type-IDE, a new IDE for Type-C",
+            "tags": ["type-ide", "ide", "type-c"],
+            "date": "2/01/2025",
+            "author": "praisethemoon"
+        },
+        {
             "name": "type-c-announcement",
             "title": "Announcing Type-C to the World!",
             "description": "A Quick Look into Type-C for the curious minds",

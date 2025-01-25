@@ -1,0 +1,40 @@
+# Happy new year!
+
+## About Type-IDE
+Type-C is going this new year with a new IDE specifically designed for it, which is called Type-IDE.
+
+<img src="/images/type-ide.png" alt="IR for ClosureClass.closure" />
+
+While I enjoy working a lot with vscode and cursor, I felt like Type-C needed a more specialized IDE,
+specifically for views, symbol navigation, and debugging.
+
+This IDE will have support for features like disassembly, debugging, auto-completion, and error feedback.
+
+So what features can you expect from Type-IDE?
+- Auto completion: Not as smart as VSCode, but it will get the job done.
+- Error feedback: It will show you errors in your code.
+- Symbol navigation: You can inspect symbols in your code
+- Run! You can run your code directly from the IDE.
+- Debugging: You can debug your code directly from the IDE.
+- Github Copilot: Probably not going to be as good for Type-C, since it is a new language, but it will still help
+
+## Tech Behind Type-IDE
+The IDE is built with Electron, TypeScript, React and DaisyUI/TailwindCSS.
+The Editor it self is monaco, same tech as vscode.
+
+## Current Status
+The IDE features a small websocket based server that communicates with the Type-C compiler.
+This server is not compliant with Microsoft's LSP, it rather a custom websocket based server.
+
+This Server keeps the state of the compiler in memory and will respond with the appropriate information when requested.
+
+One major hurdle is that Type-C compiler is not incremental, it will crash. Making it unreliable for accurate error feedback
+and auto completion.
+
+This is something that still needs to be improved before the editor is made public.
+
+## When to expect Type-IDE?
+There are few issues and features that I want to implement before making the Editor public:
+1. Full LSP compliance
+2. Full GH Copilot Integration
+3. Decreasing the amount of bugs in the Editor.
